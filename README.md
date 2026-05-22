@@ -1,42 +1,73 @@
 # AI / ML
 
-**What we’re testing:** how you wire LLM components end-to-end, your honesty about model limits, and whether your prompts and traces look like a person who thought about it rather than someone who copied a tutorial.
+**What we are testing:** how you wire LLM components end-to-end, your honesty about model limits, and whether your prompts and traces look like a person who thought about it rather than someone who copied a tutorial.
 
 ---
 
-## Q1. Document Q&A with Citations
+## What This Repo Implements
 
-Build a RAG system over five or more documents of your choice. Any domain. Anything substantive (policy text, product docs, research papers, technical guides). The point is your retrieval, your chunking strategy, and your discipline about not letting the model hallucinate when the docs don’t cover the answer.
+### Q1. Document Q&A with Citations
+RAG over research papers with ingestion, chunking, embeddings, Chroma vector storage, optional reranking, and citations.
 
-### REQUIRED
-- Ingest, chunk, embed, and store the documents. Explain your chunking strategy in the README.
-- An `/ask` endpoint that returns answers with citations. Each citation must include the source file, the chunk or page reference, and the snippet used.
-- A `/contradict` endpoint that takes two document IDs and returns whether they conflict on a topic, with reasoning.
-- A multilingual flow: a query in one language returns an answer in the same language. A translation step at the boundary is acceptable for the 24-hour version.
-- A simple Streamlit or Gradio UI so we can try it without Postman.
-- No silent hallucination. If the docs do not cover the question, the system must say so explicitly.
-- Any vector store (Chroma, FAISS, pgvector). Any LLM with a free tier (Groq, Gemini, OpenAI free credits).
-
-### STRETCH (OPTIONAL)
-- A confidence score per answer with a human-in-the-loop gate when confidence falls below a threshold.
-- A reranker layered on top of vector retrieval.
-- An eval set of 10 Q&A pairs with ground truth, scored on retrieval at top-k.
+### Q2. Triage Agent with Real Tool Calling
+Not implemented in this repo.
 
 ---
 
-## Q2. Triage Agent with Real Tool Calling
+## How To Run
 
-Build an agentic system that takes a free-text input (the input could be a complaint, a request, a ticket, you decide), and produces a structured triage decision. Use real tool calling, not a string-matching shortcut.
+### 1) Setup
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
 
-### REQUIRED
-- **Input:** free text plus optional metadata.
-- **Output:** `{ category, priority, next_tool, reasoning }`. You define four to six categories and a P0 / P1 / P2 priority scheme.
-- Three callable tools that the agent picks from. You implement them as real functions. Examples: a lookup tool, an acknowledgment-drafting tool, a similar-past-input search tool. Pick what fits your problem framing.
-- The full reasoning trace must be visible for every decision. Not just the final answer.
-- An `/examples` folder with at least ten test inputs and the agent’s outputs.
-- A “why” explanation field on every output. No silent magic.
+### 2) Configure
+Create a `.env` file in the project root:
+```
+GROQ_API_KEY=your_key_here
+```
 
-### STRETCH (OPTIONAL)
-- A low-confidence escalation path that calls a human-in-the-loop tool when the agent is unsure.
-- Run the same ten examples through a baseline (single-prompt classifier) and report the numbers side by side.
-- A small Streamlit UI that visualises the reasoning trace as a tree.
+### 3) Run API
+```powershell
+python run.py api
+```
+
+### 4) Run UI
+```powershell
+python run.py ui
+```
+
+### 5) Ingest Documents
+Put PDFs in `data/raw/` and run:
+```powershell
+python run.py api
+python run.py ui  
+
+```
+Or use the UI upload tab to send files to `/ingest`.
+
+---
+
+## Design Decisions
+
+- **Chunking strategy:** RecursiveCharacterTextSplitter with chunk size 700 and overlap 120, using paragraph -> sentence -> word fallbacks. Chunks shorter than 50 characters are dropped to reduce noise.
+- **Embeddings:** sentence-transformers/all-MiniLM-L6-v2 for fast, local embeddings.
+- **Vector store:** Chroma persistent client with cosine similarity and on-disk persistence at ./data/embeddings.
+- **Reranking:** Optional CrossEncoder ms-marco-MiniLM-L-6-v2 reranks top-k results; failure falls back to original ranking.
+- **Language handling:** Language detected with langdetect. Non-English queries are translated to English for retrieval, then answers are returned in the original language.
+- **LLM generation:** Groq llama-3.3-70b-versatile for response generation with low temperature and retries.
+- **No silent hallucinations:** When retrieval is empty or weak, the API returns a fallback message instead of an invented answer.
+- **Citations:** Each cited chunk includes source, page, chunk id, and snippet (first 200 characters).
+
+---
+
+
+## AI USE LOG
+
+- GitHub Copilot: ~20 messages. Used for README edits and code assistance in this repo.
+- Gemini: ~20-30 messages. Used for drafting prompts and checking output quality.
+- ChatGPT: ~10-15 messages. Used for quick sanity checks and alternative phrasing.
+- Arena AI: 8-10 messages with Claude Sonnet 4.6 and 2-3 message comparisons with GPT-5.2. Used for PRD comparison and prompt evaluation.
+- Groq (llama-3.3-70b-versatile): Used as the runtime LLM for generation. Logs stored in [LLM logs/](LLM%20logs/).
