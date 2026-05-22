@@ -42,7 +42,7 @@ python run.py ui
 ### 5) Ingest Documents
 Put PDFs in `data/raw/` and run:
 ```powershell
-python run.py 
+python run.py ingest
 ```
 Or use the UI upload tab to send files to `/ingest`.
 
